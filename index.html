@@ -19,7 +19,6 @@
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      /* removed max-width: 600px; */
       width: 90%;
       background: #fff;
       border-radius: 8px;
@@ -48,13 +47,8 @@
       border: 1px solid #ddd;
       margin-top: 20px;
       display: block;
-      /* enlarged canvas for a bigger view */
       width: 1200px;
       height: 500px;
-    }
-    #damagePotential {
-      margin-top: 10px;
-      font-weight: bold;
     }
   </style>
 </head>
@@ -67,7 +61,7 @@
         <span id="frequencyValue">50 Hz</span>
     </div>
     <div>
-        <label for="amplitudeSlider">Rystelse:</label>
+        <label for="amplitudeSlider">Amplitude:</label>
         <input type="range" id="amplitudeSlider" min="0" max="120" value="20">
         <span id="amplitudeValue">20 mm/s</span>
     </div>
@@ -78,7 +72,6 @@
   </div>
 
   <canvas id="vibrationCanvas" width="1200" height="500"></canvas>
-  <!-- <div id="damagePotential"></div> -->
 
   <script>
     const freqSlider = document.getElementById('frequencySlider');
@@ -89,72 +82,89 @@
     const stopBtn = document.getElementById('stopBtn');
     const canvas = document.getElementById('vibrationCanvas');
     const ctx = canvas.getContext('2d');
-    // const damageLabel = document.getElementById('damagePotential');
 
     let animationId;
     let startTime = null;
+    let audioContext, oscillator, gainNode;
 
     function updateLabels() {
-  freqVal.textContent = freqSlider.value + " Hz";
-  ampVal.textContent = ampSlider.value + " mm/s";
-}
-
-    // function calculateDamagePotential(freq, amp) {
-    //   let potential = freq * amp;
-    //   if (potential < 15000) return "Damage Potential: Low";
-    //   else if (potential < 30000) return "Damage Potential: Medium";
-    //   else return "Damage Potential: High";
-    // }
+      freqVal.textContent = freqSlider.value + " Hz";
+      ampVal.textContent = ampSlider.value + " mm/s";
+    }
 
     function draw(timestamp) {
       if (!startTime) startTime = timestamp;
       const elapsed = (timestamp - startTime) / 1000;
       const freq = Number(freqSlider.value);
       const amp = Number(ampSlider.value);
-      const amplitudeScale = (canvas.height / 2 - 10) / 120; // keep wave within canvas
+      const amplitudeScale = (canvas.height / 2 - 10) / 120;
       const scaledAmp = amp * amplitudeScale;
-        // Scale frequency to 1/4 for easier viewing
-      const scaledFreq = Number(freqSlider.value) / 8;
+      const scaledFreq = freq / 8;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'blue';
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-
       ctx.beginPath();
-      // Oversample to reduce aliasing
+
       const numSamples = canvas.width * 4;
-      const timeStep = 0.001; // 1 ms per step
+      const timeStep = 0.001;
       for (let i = 0; i <= numSamples; i++) {
         const t = elapsed + i * timeStep;
-        const px = i / 4; // compress to canvas width
+        const px = i / 4;
         const y = scaledAmp * Math.sin(2 * Math.PI * scaledFreq * t);
         const py = canvas.height / 2 - y;
-
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
       }
       ctx.stroke();
-
-    //   damageLabel.textContent = calculateDamagePotential(freq, amp);
       animationId = requestAnimationFrame(draw);
+    }
+
+    function startAudio() {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      oscillator = audioContext.createOscillator();
+      gainNode = audioContext.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = freqSlider.value;
+      gainNode.gain.value = ampSlider.value / 120;
+      oscillator.connect(gainNode).connect(audioContext.destination);
+      oscillator.start();
+    }
+
+    function stopAudio() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator.disconnect();
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
     }
 
     function startAnimation() {
       if (!animationId) {
         startTime = null;
         animationId = requestAnimationFrame(draw);
+        startAudio();
       }
     }
 
     function stopAnimation() {
       cancelAnimationFrame(animationId);
       animationId = null;
+      stopAudio();
     }
 
-    freqSlider.addEventListener('input', updateLabels);
-    ampSlider.addEventListener('input', updateLabels);
+    freqSlider.addEventListener('input', () => {
+      updateLabels();
+      if (oscillator) oscillator.frequency.value = freqSlider.value;
+    });
+    ampSlider.addEventListener('input', () => {
+      updateLabels();
+      if (gainNode) gainNode.gain.value = ampSlider.value / 120;
+    });
     startBtn.addEventListener('click', startAnimation);
     stopBtn.addEventListener('click', stopAnimation);
     updateLabels();

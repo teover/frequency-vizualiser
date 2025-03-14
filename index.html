@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Rock Blast Vibration Visualizer</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom, #efefef, #fff);
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 { font-weight: 400; margin-bottom: 10px; }
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      /* removed max-width: 600px; */
+      width: 90%;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    label { margin-right: 10px; font-weight: bold; }
+    input[type="range"] {
+      width: 250px;
+      vertical-align: middle;
+    }
+    #buttons { margin-top: 10px; }
+    button {
+      margin-right: 10px;
+      padding: 6px 12px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover { background-color: #45a049; }
+    #vibrationCanvas {
+      border: 1px solid #ddd;
+      margin-top: 20px;
+      display: block;
+      /* enlarged canvas for a bigger view */
+      width: 1200px;
+      height: 500px;
+    }
+    #damagePotential {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Rock Blast Vibration Visualizer</h1>
+  <div class="controls">
+    <div>
+        <label for="frequencySlider">Frequency:</label>
+        <input type="range" id="frequencySlider" min="0" max="200" value="50">
+        <span id="frequencyValue">50 Hz</span>
+    </div>
+    <div>
+        <label for="amplitudeSlider">Rystelse:</label>
+        <input type="range" id="amplitudeSlider" min="0" max="120" value="20">
+        <span id="amplitudeValue">20 mm/s</span>
+    </div>
+    <div id="buttons">
+      <button id="startBtn">Start</button>
+      <button id="stopBtn">Stop</button>
+    </div>
+  </div>
+
+  <canvas id="vibrationCanvas" width="1200" height="500"></canvas>
+  <!-- <div id="damagePotential"></div> -->
+
+  <script>
+    const freqSlider = document.getElementById('frequencySlider');
+    const ampSlider = document.getElementById('amplitudeSlider');
+    const freqVal = document.getElementById('frequencyValue');
+    const ampVal = document.getElementById('amplitudeValue');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const canvas = document.getElementById('vibrationCanvas');
+    const ctx = canvas.getContext('2d');
+    // const damageLabel = document.getElementById('damagePotential');
+
+    let animationId;
+    let startTime = null;
+
+    function updateLabels() {
+  freqVal.textContent = freqSlider.value + " Hz";
+  ampVal.textContent = ampSlider.value + " mm/s";
+}
+
+    // function calculateDamagePotential(freq, amp) {
+    //   let potential = freq * amp;
+    //   if (potential < 15000) return "Damage Potential: Low";
+    //   else if (potential < 30000) return "Damage Potential: Medium";
+    //   else return "Damage Potential: High";
+    // }
+
+    function draw(timestamp) {
+      if (!startTime) startTime = timestamp;
+      const elapsed = (timestamp - startTime) / 1000;
+      const freq = Number(freqSlider.value);
+      const amp = Number(ampSlider.value);
+      const amplitudeScale = (canvas.height / 2 - 10) / 120; // keep wave within canvas
+      const scaledAmp = amp * amplitudeScale;
+        // Scale frequency to 1/4 for easier viewing
+      const scaledFreq = Number(freqSlider.value) / 8;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'blue';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      ctx.beginPath();
+      // Oversample to reduce aliasing
+      const numSamples = canvas.width * 4;
+      const timeStep = 0.001; // 1 ms per step
+      for (let i = 0; i <= numSamples; i++) {
+        const t = elapsed + i * timeStep;
+        const px = i / 4; // compress to canvas width
+        const y = scaledAmp * Math.sin(2 * Math.PI * scaledFreq * t);
+        const py = canvas.height / 2 - y;
+
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+    //   damageLabel.textContent = calculateDamagePotential(freq, amp);
+      animationId = requestAnimationFrame(draw);
+    }
+
+    function startAnimation() {
+      if (!animationId) {
+        startTime = null;
+        animationId = requestAnimationFrame(draw);
+      }
+    }
+
+    function stopAnimation() {
+      cancelAnimationFrame(animationId);
+      animationId = null;
+    }
+
+    freqSlider.addEventListener('input', updateLabels);
+    ampSlider.addEventListener('input', updateLabels);
+    startBtn.addEventListener('click', startAnimation);
+    stopBtn.addEventListener('click', stopAnimation);
+    updateLabels();
+  </script>
+</body>
+</html>
